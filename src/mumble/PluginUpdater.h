@@ -32,6 +32,10 @@ struct UpdateEntry {
 	QUrl updateURL;
 	QString fileName;
 	int redirects = 0;
+	
+	UpdateEntry() = default;
+	UpdateEntry(plugin_id_t id, const QUrl& url, const QString& name, int redirectCount)
+		: pluginID(id), updateURL(url), fileName(name), redirects(redirectCount) {}
 };
 
 /// A class designed for managing plugin updates. At the same time this also represents
