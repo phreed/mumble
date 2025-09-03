@@ -46,8 +46,7 @@ void PluginUpdater::checkForUpdates() {
 				QUrl updateURL = plugin->getUpdateDownloadURL();
 
 				if (updateURL.isValid() && !updateURL.isEmpty() && !updateURL.fileName().isEmpty()) {
-					UpdateEntry entry = { plugin->getID(), updateURL, updateURL.fileName(), 0 };
-					m_pluginsToUpdate << entry;
+				    m_pluginsToUpdate.append(UpdateEntry(plugin->getID(), updateURL));
 				}
 			}
 
