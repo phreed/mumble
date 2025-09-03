@@ -11,6 +11,7 @@
 #include <QtCore/QMutex>
 #include <QtCore/QUrl>
 #include <QtCore/QVector>
+#include <QtCore/QString>
 
 #include <atomic>
 #include <limits>

@@ -331,7 +331,7 @@ void PluginUpdater::on_updateDownloaded(QNetworkReply *reply) {
 			{
 				QMutexLocker l(&m_dataMutex);
 
-				m_pluginsToUpdate << entry;
+				mpluginsToUpdate.append(entry);
 			}
 
 			// Post a new request for the file to the new URL
