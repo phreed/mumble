@@ -1,0 +1,133 @@
+[workspace]
+name = "mumble"
+version = "1.6.0"
+description = "Open source, low-latency, high quality voice chat software"
+authors = ["Mumble Developers <mumble-dev@mumble.info>"]
+channels = ["conda-forge"]
+platforms = ["linux-64"]
+
+[dependencies]
+# Build tools
+cmake = ">=3.23"
+ninja = "*"
+pkg-config = "*"
+python = ">=3.8"
+
+# Compilers
+cxx-compiler = "*"
+c-compiler = "*"
+
+# Qt6 dependencies - Core UI framework
+qt6-main = "*"
+
+# Core libraries
+openssl = "*"                    # SSL/TLS encryption
+protobuf = ">=3.0"              # Protocol buffers (meta package)
+libprotobuf = "*"               # Protocol buffers library
+protobuf-c = "*"                # C bindings for protobuf
+boost-cpp = "*"                 # Boost C++ libraries
+libsndfile = "*"                # Sound file I/O
+libogg = "*"                    # Ogg container format
+libvorbis = "*"                 # Vorbis audio codec
+libopus = "*"                   # Opus audio codec
+soxr = "*"                      # High-quality audio resampling
+
+# Audio system libraries
+alsa-lib = "*"                  # Advanced Linux Sound Architecture
+portaudio = "*"                 # Cross-platform audio I/O
+
+# System libraries
+libcap = "*"                    # POSIX capabilities
+
+# OpenGL libraries - Required for overlay functionality
+libgl = "*"                     # OpenGL library
+libglu = "*"                    # OpenGL utilities
+libgl-devel = "*"               # OpenGL development headers
+
+# X11 libraries - Required for Linux GUI
+xorg-libx11 = "*"               # X11 client library
+xorg-libxext = "*"              # X11 extensions
+libxi-devel-cos7-x86_64 = "*"   # X11 Input extension (development)
+
+# Network libraries
+avahi = "*"                     # Zeroconf/mDNS service discovery
+
+# Development libraries
+spdlog = "*"                    # Fast C++ logging library
+nlohmann_json = "*"             # JSON for Modern C++
+poco = "*"                      # C++ libraries for network programming
+
+[tasks.configure]
+description = "Main configuration task - builds client only with minimal features"
+cmd = "cmake -B build -DCMAKE_BUILD_TYPE=Release -G Ninja -Dserver=OFF -Doverlay-xcompile=OFF -Dcrash-report=OFF -Dplugins=OFF -Duse-webrtc-aec=OFF -Dspeechd=OFF -Dzeroconf=OFF -Dwarnings-as-errors=OFF -Dbundled-speex=ON -DCMAKE_PREFIX_PATH=$CONDA_PREFIX"
+
+[tasks.configure-debug]
+description = "Debug configuration"
+cmd = "cmake -B build -DCMAKE_BUILD_TYPE=Debug -G Ninja -Dserver=OFF -Doverlay-xcompile=OFF -Dcrash-report=OFF -Dplugins=OFF -Duse-webrtc-aec=OFF -Dspeechd=OFF -Dzeroconf=OFF -Dwarnings-as-errors=OFF -Dbundled-speex=ON -DCMAKE_PREFIX_PATH=$CONDA_PREFIX"
+
+[tasks.build]
+description = "Build tasks"
+cmd = "cmake --build build"
+
+[tasks.build-parallel]
+description = "Parallel build tasks"
+cmd = "cmake --build build --parallel"
+
+[tasks.clean]
+description = "Clean build tasks"
+cmd = "cmake --build build --target clean"
+
+[tasks.install]
+description = "Install tasks"
+cmd = "cmake --build build --target install"
+
+[tasks.build-client]
+description = "One-step build tasks"
+cmd = "cmake --build build"
+depends-on = ["configure"]
+
+[tasks.build-all]
+description = "Parallel build tasks"
+cmd = "cmake --build build --parallel"
+depends-on = ["configure"]
+
+[tasks.configure-full]
+description = "Full client configuration with all features (requires additional system dependencies)"
+cmd = "cmake -B build -DCMAKE_BUILD_TYPE=Release -G Ninja -Dserver=OFF -Dbundled-speex=ON -DCMAKE_PREFIX_PATH=$CONDA_PREFIX"
+
+# Test tasks
+[tasks.test]
+cmd = "cmake --build build --target test"
+
+[tasks.run-tests]
+cmd = "ctest --test-dir build --verbose"
+depends-on = ["build"]
+
+# Utility tasks
+[tasks.setup]
+cmd = "git submodule update --init --recursive"
+description = "Initialize git submodules"
+
+[tasks.reset]
+cmd = "rm -rf build"
+description = "Clean build directory"
+
+[environments]
+default = { solve-group = "default" }
+
+# Usage Instructions:
+# 1. First time setup: pixi run setup
+# 2. Configure build: pixi run configure
+# 3. Build project: pixi run build
+# 4. Or do it all at once: pixi run build-all
+#
+# Features disabled for compatibility:
+# - Server components (Murmur)
+# - 32-bit overlay cross-compilation
+# - Crash reporting (requires additional Poco components)
+# - Plugin system
+# - WebRTC audio processing
+# - Speech dispatcher integration
+# - Zeroconf/mDNS service discovery
+#
+# To enable more features, use configure-full but you may need additional system packages.
