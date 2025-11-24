@@ -9,7 +9,7 @@
 #include <QtCore/QFile>
 #include <QtCore/QObject>
 #include <sndfile.h>
-#include <speex/speex_resampler.h>
+#include "AudioProcessingAdapter.h"
 
 #include "AudioOutputBuffer.h"
 
@@ -49,7 +49,7 @@ protected:
 	unsigned int iLastConsume;
 	unsigned int iBufferFilled;
 	unsigned int iOutSampleRate;
-	SpeexResamplerState *srs;
+	std::unique_ptr<AudioProcessingAdapter::Resampler> srs;
 
 	SoundFile *sfHandle;
 

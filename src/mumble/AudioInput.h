@@ -18,8 +18,7 @@
 #include <mutex>
 #include <vector>
 
-#include <speex/speex_echo.h>
-#include <speex/speex_resampler.h>
+#include "AudioProcessingAdapter.h"
 
 #include "Audio.h"
 #include "AudioOutputToken.h"
@@ -177,7 +176,7 @@ private:
 	bool bDebugDumpInput;                           ///< When true, dump pcm data to debug the echo canceller
 	std::ofstream outMic, outSpeaker, outProcessed; ///< Files to dump raw pcm data
 
-	SpeexResamplerState *srsMic, *srsEcho;
+	std::unique_ptr<AudioProcessingAdapter::Resampler> srsMic, srsEcho;
 
 	std::unique_ptr< Mumble::Protocol::byte[] > m_legacyBuffer;
 	Mumble::Protocol::UDPAudioEncoder< Mumble::Protocol::Role::Client > m_udpEncoder;
@@ -223,8 +222,8 @@ protected:
 	static const int iFrameSize = SAMPLE_RATE / 100;
 
 	QMutex qmSpeex;
-	AudioPreprocessor m_preprocessor;
-	SpeexEchoState *sesEcho;
+	std::unique_ptr<AudioProcessingAdapter::Preprocessor> m_preprocessor;
+	std::unique_ptr<AudioProcessingAdapter::EchoCanceller> sesEcho;
 
 	/// bResetEncoder is a flag that notifies
 	/// our encoder functions that the encoder

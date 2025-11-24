@@ -1,0 +1,390 @@
+= Building Mumble with Opus Audio Processing
+:toc:
+:numbered:
+
+== Overview
+
+Mumble now supports a modern Opus-based audio processing pipeline as an alternative to the legacy SpeexDSP implementation.
+This new pipeline provides superior audio quality, better performance, and more advanced features.
+
+== Prerequisites
+
+=== Required Dependencies
+
+To build Mumble with Opus audio processing enabled, you need the following additional dependencies:
+
+==== libsoxr (SoX Resampler)
+
+High-quality audio resampling library.
+
+*Ubuntu/Debian:*
+[source,bash]
+----
+sudo apt-get install libsoxr-dev
+----
+
+*Fedora/RHEL:*
+[source,bash]
+----
+sudo dnf install soxr-devel
+----
+
+*macOS (Homebrew):*
+[source,bash]
+----
+brew install libsoxr
+----
+
+*Windows (vcpkg):*
+[source,bash]
+----
+vcpkg install soxr
+----
+
+==== WebRTC Audio Processing Module (Optional)
+
+For advanced echo cancellation and audio preprocessing.
+
+*Note:* WebRTC APM is a complex dependency.
+Consider using the system package if available, or disable this feature if you encounter build issues.
+
+*Ubuntu/Debian:*
+[source,bash]
+----
+# WebRTC APM may not be packaged in all distributions
+# You may need to build from source or use bundled version
+----
+
+*Building from Source:*
+[source,bash]
+----
+git clone https://chromium.googlesource.com/external/webrtc
+cd webrtc
+# Follow WebRTC build instructions for your platform
+----
+
+=== Optional Dependencies
+
+==== RNNoise
+
+Machine learning-based noise suppression (already supported in Mumble).
+
+*Ubuntu/Debian:*
+[source,bash]
+----
+sudo apt-get install librnnoise-dev
+----
+
+== Build Configuration
+
+=== CMake Options
+
+The following CMake options control the Opus audio processing features:
+
+[cols="3,1,1,4"]
+|===
+|Option |Type |Default |Description
+
+|`opus-audio-processing`
+|BOOL
+|ON
+|Enable Opus-based audio processing pipeline
+
+|`use-libsoxr`
+|BOOL
+|ON (if opus-audio-processing=ON)
+|Use libsoxr for high-quality resampling
+
+|`use-webrtc-aec`
+|BOOL
+|ON (if opus-audio-processing=ON)
+|Use WebRTC for echo cancellation and preprocessing
+
+|`bundled-speex`
+|BOOL
+|OFF (if opus-audio-processing=ON)
+|Use bundled SpeexDSP (legacy fallback)
+
+|`rnnoise`
+|BOOL
+|ON
+|Enable RNNoise machine learning noise suppression
+|===
+
+=== Basic Configuration
+
+To build with Opus audio processing enabled:
+
+[source,bash]
+----
+cmake -B build \
+    -DCMAKE_BUILD_TYPE=Release \
+    -Dopus-audio-processing=ON \
+    -Duse-libsoxr=ON \
+    -Duse-webrtc-aec=ON \
+    -Drnnoise=ON \
+    .
+----
+
+=== Minimal Configuration (libsoxr only)
+
+If you want to use only libsoxr resampling without WebRTC dependencies:
+
+[source,bash]
+----
+cmake -B build \
+    -DCMAKE_BUILD_TYPE=Release \
+    -Dopus-audio-processing=ON \
+    -Duse-libsoxr=ON \
+    -Duse-webrtc-aec=OFF \
+    .
+----
+
+=== Fallback Configuration (SpeexDSP)
+
+To use the legacy SpeexDSP pipeline:
+
+[source,bash]
+----
+cmake -B build \
+    -DCMAKE_BUILD_TYPE=Release \
+    -Dopus-audio-processing=OFF \
+    -Dbundled-speex=ON \
+    .
+----
+
+== Platform-Specific Instructions
+
+=== Linux
+
+==== Ubuntu 20.04/22.04
+
+[source,bash]
+----
+# Install dependencies
+sudo apt-get update
+sudo apt-get install \
+    build-essential \
+    cmake \
+    ninja-build \
+    pkg-config \
+    qtbase5-dev \
+    qttools5-dev \
+    qttools5-dev-tools \
+    libqt5svg5-dev \
+    libboost-dev \
+    libssl-dev \
+    libprotobuf-dev \
+    protobuf-compiler \
+    libcap-dev \
+    libxi-dev \
+    libasound2-dev \
+    libogg-dev \
+    libsndfile1-dev \
+    libspeechd-dev \
+    libopus-dev \
+    libsoxr-dev \
+    librnnoise-dev
+
+# Configure and build
+cmake -B build -G Ninja \
+    -DCMAKE_BUILD_TYPE=Release \
+    -Dopus-audio-processing=ON \
+    -Duse-libsoxr=ON \
+    -Duse-webrtc-aec=OFF \
+    .
+
+ninja -C build
+----
+
+=== macOS
+
+[source,bash]
+----
+# Install dependencies via Homebrew
+brew install cmake ninja pkg-config qt6 boost openssl protobuf \
+             opus libsoxr rnnoise
+
+# Configure and build
+cmake -B build -G Ninja \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_PREFIX_PATH="$(brew --prefix qt6)" \
+    -Dopus-audio-processing=ON \
+    -Duse-libsoxr=ON \
+    -Duse-webrtc-aec=OFF \
+    .
+
+ninja -C build
+----
+
+=== Windows
+
+==== Using vcpkg
+
+[source,powershell]
+----
+# Install vcpkg dependencies
+vcpkg install --triplet x64-windows \
+    qt6-base qt6-tools qt6-svg \
+    boost-system boost-optional \
+    openssl protobuf \
+    opus soxr
+
+# Configure with Visual Studio
+cmake -B build -G "Visual Studio 17 2022" -A x64 \
+    -DCMAKE_TOOLCHAIN_FILE=[path-to-vcpkg]/scripts/buildsystems/vcpkg.cmake \
+    -DVCPKG_TARGET_TRIPLET=x64-windows \
+    -Dopus-audio-processing=ON \
+    -Duse-libsoxr=ON \
+    -Duse-webrtc-aec=OFF \
+    .
+
+# Build
+cmake --build build --config Release
+----
+
+== Troubleshooting
+
+=== Common Issues
+
+==== libsoxr not found
+
+*Error:*
+```
+CMake Error at cmake/FindSoxr.cmake:112 (find_package_handle_standard_args):
+  Could not find a package configuration file provided by "soxr"
+```
+
+*Solution:*
+Ensure libsoxr is installed and can be found by pkg-config:
+
+[source,bash]
+----
+pkg-config --exists soxr && echo "Found" || echo "Not found"
+pkg-config --modversion soxr
+----
+
+If not found, install libsoxr-dev package or build from source.
+
+==== WebRTC build errors
+
+*Error:*
+```
+CMake Error: Could not find webrtc
+```
+
+*Solution:*
+WebRTC is complex to build.
+Disable it for now:
+
+[source,bash]
+----
+cmake -B build -Duse-webrtc-aec=OFF .
+----
+
+==== Missing RNNoise
+
+*Error:*
+```
+rnnoise.h: No such file or directory
+```
+
+*Solution:*
+Either install librnnoise-dev or disable RNNoise:
+
+[source,bash]
+----
+cmake -B build -Drnnoise=OFF .
+----
+
+=== Performance Considerations
+
+The Opus audio processing pipeline is generally more efficient than SpeexDSP, but some considerations:
+
+- libsoxr uses more CPU than Speex resampler for very high quality settings
+- RNNoise provides excellent noise suppression but uses more CPU
+- WebRTC AEC is more sophisticated but requires more memory
+
+You can adjust quality settings at runtime through Mumble's audio settings.
+
+=== Verification
+
+To verify that Opus audio processing is working:
+
+1. Start Mumble
+2. Go to Configure → Settings → Audio Input
+3. Check that "Audio Processing" shows "Opus Audio Processing" instead of "SpeexDSP"
+4. The advanced settings should show libsoxr and other new features
+
+== Migration from SpeexDSP
+
+=== Automatic Migration
+
+When you first run Mumble with Opus audio processing:
+
+- Existing audio quality settings are automatically converted
+- Echo cancellation settings are mapped to WebRTC equivalents
+- Noise suppression levels are preserved
+
+=== Manual Settings Review
+
+After migration, review these settings:
+
+- Audio quality: May need adjustment due to different algorithms
+- Echo cancellation: New options available with WebRTC
+- Noise suppression: RNNoise provides better quality
+
+=== Compatibility
+
+- Network protocol remains unchanged
+- Recordings and audio files are compatible
+- Can communicate with older Mumble clients without issues
+
+== Performance Comparison
+
+[cols="3,2,2,3"]
+|===
+|Feature |SpeexDSP |Opus Processing |Improvement
+
+|Resampling Quality
+|Good
+|Excellent
+|Better frequency response, fewer artifacts
+
+|Echo Cancellation
+|Basic
+|Advanced (WebRTC)
+|Better adaptation, lower latency
+
+|Noise Suppression
+|Spectral subtraction
+|ML-based (RNNoise)
+|Superior speech preservation
+
+|CPU Usage
+|Baseline
+|Similar to 10% higher
+|Negligible impact on modern systems
+
+|Memory Usage
+|Low
+|Moderate
+|Acceptable for quality improvement
+|===
+
+== Future Development
+
+The Opus audio processing pipeline is designed for future enhancements:
+
+- Integration of additional WebRTC features
+- Support for spatial audio processing
+- Advanced voice activity detection
+- Real-time audio quality metrics
+- Machine learning-based audio enhancement
+
+== References
+
+- https://opus-codec.org/[Opus Codec]
+- https://sourceforge.net/projects/soxr/[libsoxr Project]
+- https://webrtc.org/[WebRTC Project]
+- https://jmvalin.ca/demo/rnnoise/[RNNoise]

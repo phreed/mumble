@@ -150,11 +150,13 @@ AudioOutputSample::AudioOutputSample(SoundFile *psndfile, float volume, bool loo
 
 	// If the frequencies don't match initialize the resampler
 	if (sfHandle->samplerate() != static_cast< int >(freq)) {
-		srs = speex_resampler_init(bStereo ? 2 : 1, static_cast< unsigned int >(sfHandle->samplerate()), iOutSampleRate,
-								   3, &err);
-		if (err != RESAMPLER_ERR_SUCCESS) {
+		srs = AudioProcessingAdapter::Resampler::create(
+			static_cast< unsigned int >(sfHandle->samplerate()), 
+			iOutSampleRate, 
+			bStereo ? 2 : 1
+		);
+		if (!srs) {
 			qWarning() << "Initialize " << sfHandle->samplerate() << " to " << iOutSampleRate << " resampler failed!";
-			srs      = nullptr;
 			sfHandle = nullptr;
 			return;
 		}
@@ -173,8 +175,7 @@ float AudioOutputSample::getVolume() const {
 }
 
 AudioOutputSample::~AudioOutputSample() {
-	if (srs)
-		speex_resampler_destroy(srs);
+	srs.reset();
 
 	delete sfHandle;
 	sfHandle = nullptr;
@@ -268,13 +269,19 @@ bool AudioOutputSample::prepareSampleBuffer(unsigned int frameCount) {
 
 		spx_uint32_t inlen  = static_cast< unsigned int >(read) / channels;
 		spx_uint32_t outlen = frameCount;
-		if (srs) {
-			// If necessary resample
+		if (srs && srs->isValid()) {
+			std::uint32_t inFrames = inlen;
+			std::uint32_t outFrames = outlen;
 			if (!bStereo) {
-				speex_resampler_process_float(srs, 0, pOut, &inlen, pfBuffer + iBufferFilled, &outlen);
+				srs->processFloat(pOut, &inFrames, pfBuffer + iBufferFilled, &outFrames);
 			} else {
-				speex_resampler_process_interleaved_float(srs, pOut, &inlen, pfBuffer + iBufferFilled, &outlen);
+				srs->processInterleavedFloat(pOut, &inFrames, pfBuffer + iBufferFilled, &outFrames);
 			}
+			inlen = inFrames;
+			outlen = outFrames;
+		} else {
+			// No resampling needed, direct copy
+			std::copy(pOut, pOut + outlen * channels, pfBuffer + iBufferFilled);
 		}
 
 		iBufferFilled += outlen * channels;

@@ -18,9 +18,12 @@ include(install-library)
 option(update "Check for updates by default." ON)
 
 option(translations "Include languages other than English." ON)
-option(bundle-qt-translations "Bundle Qt's translations as well" ${static}) 
+option(bundle-qt-translations "Bundle Qt's translations as well" ${static})
 
-option(bundled-speex "Build the included version of Speex instead of looking for one on the system." ON)
+option(bundled-speex "Build the included version of Speex instead of looking for one on the system." OFF)
+option(opus-audio-processing "Use Opus-based audio processing pipeline instead of SpeexDSP." ON)
+option(use-libsoxr "Use libsoxr for high-quality audio resampling." ${opus-audio-processing})
+option(use-webrtc-aec "Use WebRTC Audio Processing Module for echo cancellation and preprocessing." ${opus-audio-processing})
 option(rnnoise "Use RNNoise for machine learning noise reduction." ON)
 option(bundled-rnnoise "Build the included version of RNNoise instead of looking for one on the system." ${rnnoise})
 
@@ -729,8 +732,26 @@ elseif(TARGET Opus::opus)
 	target_link_libraries(mumble_client_object_lib PUBLIC Opus::opus)
 endif()
 
-if(bundled-speex)
-	add_subdirectory("${3RDPARTY_DIR}/speexdsp-build" "${CMAKE_CURRENT_BINARY_DIR}/speexdsp" EXCLUDE_FROM_ALL)
+if(opus-audio-processing)
+	target_compile_definitions(mumble_client_object_lib PUBLIC USE_OPUS_AUDIO_PROCESSING)
+
+	if(use-libsoxr)
+		find_pkg("soxr" REQUIRED)
+		target_compile_definitions(mumble_client_object_lib PUBLIC USE_LIBSOXR)
+		target_link_libraries(mumble_client_object_lib PUBLIC ${soxr_LIBRARIES})
+		target_include_directories(mumble_client_object_lib PUBLIC ${soxr_INCLUDE_DIRS})
+	endif()
+
+	if(use-webrtc-aec)
+		find_pkg("webrtc" REQUIRED)
+		target_compile_definitions(mumble_client_object_lib PUBLIC USE_WEBRTC_AEC)
+		target_link_libraries(mumble_client_object_lib PUBLIC ${webrtc_LIBRARIES})
+		target_include_directories(mumble_client_object_lib PUBLIC ${webrtc_INCLUDE_DIRS})
+	endif()
+else()
+	# Fallback to SpeexDSP for audio processing
+	if(bundled-speex)
+		add_subdirectory("${3RDPARTY_DIR}/speexdsp-build" "${CMAKE_CURRENT_BINARY_DIR}/speexdsp" EXCLUDE_FROM_ALL)
 
 	# Disable all warnings that the speexdsp code may emit
 	disable_warnings_for_all_targets_in("${3RDPARTY_DIR}/speexdsp-build")
@@ -745,10 +766,43 @@ if(bundled-speex)
 		set_target_properties(speexdsp PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 	endif()
 
-	install_library(speexdsp mumble_client)
-else()
-	find_pkg(speexdsp REQUIRED)
+		install_library(speexdsp mumble_client)
+	else()
+		find_pkg(speexdsp REQUIRED)
+		target_link_libraries(mumble_client_object_lib PUBLIC ${speexdsp_LIBRARIES})
+		target_include_directories(mumble_client_object_lib PUBLIC ${speexdsp_INCLUDE_DIRS})
+	endif()
+endif()
 
+# Add new source files for Opus audio processing
+if(opus-audio-processing)
+	target_sources(mumble_client_object_lib
+		PRIVATE
+			"OpusResampler.cpp"
+			"OpusResampler.h"
+			"OpusAudioPreprocessor.cpp"
+			"OpusAudioPreprocessor.h"
+			"AudioProcessingAdapter.cpp"
+			"AudioProcessingAdapter.h"
+	)
+
+	if(use-webrtc-aec)
+		target_sources(mumble_client_object_lib
+			PRIVATE
+				"OpusEchoCanceller.cpp"
+				"OpusEchoCanceller.h"
+		)
+	endif()
+else()
+	# Add adapter for SpeexDSP compatibility
+	target_sources(mumble_client_object_lib
+		PRIVATE
+			"AudioProcessingAdapter.cpp"
+			"AudioProcessingAdapter.h"
+	)
+endif()
+
+if(NOT opus-audio-processing)
 	target_link_libraries(mumble_client_object_lib
 		PUBLIC
 			${speexdsp_LIBRARIES}
@@ -843,7 +897,7 @@ if(NOT WIN32 AND NOT APPLE)
 			"DBus.cpp"
 			"DBus.h"
 	)
-	
+
 	target_compile_definitions(mumble_client_object_lib PUBLIC "USE_DBUS")
 	target_link_libraries(mumble_client_object_lib PUBLIC Qt6::DBus)
 endif()

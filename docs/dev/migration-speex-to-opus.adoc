@@ -1,0 +1,220 @@
+= Migration from SpeexDSP to Opus-based Audio Processing
+:toc:
+:numbered:
+
+== Overview
+
+This document describes the migration of Mumble from using SpeexDSP to Opus-based audio processing.
+While Opus has been supported as a codec in Mumble for some time,
+this migration focuses on replacing the audio processing pipeline components that were previously provided by SpeexDSP.
+
+== Background
+
+SpeexDSP provided several audio processing components:
+
+- Audio resampling (sample rate conversion)
+- Acoustic echo cancellation (AEC)
+- Audio preprocessing (noise suppression, VAD, AGC, dereverb)
+- Jitter buffer management
+
+Opus, while being a superior codec, is primarily focused on encoding and decoding.
+To fully replace SpeexDSP, we need to use alternative libraries for the audio processing pipeline.
+
+== Migration Components
+
+=== Audio Resampling
+
+*Previous Implementation:* `speex_resampler_*` functions
+
+*New Implementation:* libsoxr (SoX Resampler library)
+
+- High-quality resampling with configurable quality levels
+- Better performance characteristics than Speex resampler
+- More accurate frequency response
+
+*API Changes:*
+
+- `speex_resampler_init()` -> `soxr_create()`
+- `speex_resampler_process_float()` -> `soxr_process()`
+- `speex_resampler_destroy()` -> `soxr_delete()`
+
+=== Echo Cancellation
+
+*Previous Implementation:* `speex_echo_*` functions
+
+*New Implementation:* WebRTC Audio Processing Module
+
+- More advanced echo cancellation algorithms
+- Better adaptation to changing acoustic environments
+- Lower computational overhead in many scenarios
+
+*API Changes:*
+
+- `speex_echo_state_init()` -> WebRTC AEC initialization
+- `speex_echo_cancellation()` -> WebRTC AEC process
+- `speex_echo_state_destroy()` -> WebRTC AEC cleanup
+
+=== Audio Preprocessing
+
+*Previous Implementation:* `speex_preprocess_*` functions
+
+*New Implementation:* Combination of WebRTC APM and RNNoise
+
+- WebRTC APM for VAD, AGC
+- RNNoise for advanced noise suppression (already partially integrated)
+- Better speech quality preservation
+
+== Implementation Details
+
+=== Build System Changes
+
+The migration requires updates to the CMake build system:
+
+1. Remove dependency on SpeexDSP
+2. Add dependencies on libsoxr and WebRTC APM
+3. Update feature detection and configuration
+
+=== Code Structure Changes
+
+New classes and interfaces:
+
+- `OpusResampler`: Wrapper around libsoxr
+- `OpusEchoCanceller`: Wrapper around WebRTC AEC
+- `OpusPreprocessor`: Unified audio preprocessing interface
+
+=== Configuration Migration
+
+Audio settings need to be migrated:
+
+- Quality settings mapping
+- Echo cancellation parameters
+- Noise suppression levels
+- AGC configuration
+
+== Performance Considerations
+
+=== Computational Overhead
+
+- libsoxr: Lower CPU usage than Speex resampler
+- WebRTC AEC: Comparable or better performance than Speex echo cancellation
+- RNNoise: Higher CPU usage but significantly better noise suppression
+
+=== Memory Usage
+
+- Reduced memory footprint due to removal of SpeexDSP
+- WebRTC APM has configurable memory usage
+- libsoxr has minimal memory overhead
+
+=== Latency Impact
+
+- Resampling latency: Reduced with libsoxr
+- Echo cancellation latency: Similar to SpeexDSP
+- Overall pipeline latency: Expected to be comparable or improved
+
+== Backward Compatibility
+
+=== Protocol Compatibility
+
+- Opus codec support maintains protocol compatibility
+- No changes to network protocol required
+- Existing audio packet format remains unchanged
+
+=== Configuration Compatibility
+
+- Audio quality settings preserved
+- Echo cancellation can be mapped to equivalent WebRTC settings
+- Some advanced SpeexDSP-specific settings may not have direct equivalents
+
+== Migration Steps
+
+=== Phase 1: Preparation
+
+1. Update build system dependencies
+2. Create abstraction layers for audio processing components
+3. Implement feature detection for required libraries
+
+=== Phase 2: Component Replacement
+
+1. Replace resampling with libsoxr
+2. Integrate WebRTC echo cancellation
+3. Update audio preprocessing pipeline
+
+=== Phase 3: Testing and Optimization
+
+1. Comprehensive audio quality testing
+2. Performance benchmarking
+3. Cross-platform compatibility verification
+
+=== Phase 4: Documentation and Cleanup
+
+1. Update user documentation
+2. Remove SpeexDSP dependencies
+3. Update build instructions
+
+== Configuration Options
+
+=== CMake Options
+
+New configuration options:
+
+- `USE_LIBSOXR`: Enable libsoxr resampling (default: ON)
+- `USE_WEBRTC_AEC`: Enable WebRTC echo cancellation (default: ON)
+- `OPUS_QUALITY_PRESET`: Set default quality preset (default: VOIP)
+
+=== Runtime Configuration
+
+Audio settings that can be configured at runtime:
+
+- Resampling quality level
+- Echo cancellation aggressiveness
+- Noise suppression level
+- AGC target level
+
+== Quality Improvements
+
+=== Audio Quality
+
+- Better frequency response from libsoxr resampling
+- Improved echo cancellation with WebRTC AEC
+- Superior noise suppression with RNNoise
+
+=== Robustness
+
+- More stable echo cancellation in challenging acoustic environments
+- Better handling of network jitter
+- Improved voice activity detection accuracy
+
+== Known Limitations
+
+=== Library Dependencies
+
+- Additional dependencies on libsoxr and WebRTC APM
+- Increased build complexity
+- Platform-specific considerations
+
+=== Configuration Mapping
+
+- Some SpeexDSP parameters may not have direct WebRTC equivalents
+- Manual tuning may be required for optimal performance
+- Legacy configuration files may need updates
+
+== Future Considerations
+
+=== Additional Improvements
+
+- Integration of additional WebRTC APM features
+- Support for multiple echo cancellation backends
+- Advanced noise suppression algorithms
+
+=== Long-term Vision
+
+- Fully Opus-based audio pipeline
+- Reduced dependency on external audio processing libraries
+- Integration with Opus's future DSP extensions
+
+== References
+
+- https://opus-codec.org/[Opus Codec Website]
+- https://sourceforge.net/projects/soxr/[libsoxr Project]
+- https://webrtc.org/[WebRTC Project]
+- https://jmvalin.ca/demo/rnnoise/[RNNoise Project]

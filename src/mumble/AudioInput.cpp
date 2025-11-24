@@ -307,13 +307,10 @@ AudioInput::~AudioInput() {
 	}
 #endif
 
-	if (sesEcho)
-		speex_echo_state_destroy(sesEcho);
-
-	if (srsMic)
-		speex_resampler_destroy(srsMic);
-	if (srsEcho)
-		speex_resampler_destroy(srsEcho);
+	// Cleanup is handled automatically by smart pointers
+	sesEcho.reset();
+	srsMic.reset();
+	srsEcho.reset();
 
 	delete[] pfMicInput;
 	delete[] pfEchoInput;
@@ -505,15 +502,13 @@ AudioInput::inMixerFunc AudioInput::chooseMixer(const unsigned int nchan, Sample
 void AudioInput::initializeMixer() {
 	int err;
 
-	if (srsMic)
-		speex_resampler_destroy(srsMic);
-	if (srsEcho)
-		speex_resampler_destroy(srsEcho);
+	srsMic.reset();
+	srsEcho.reset();
 	delete[] pfMicInput;
 	delete[] pfEchoInput;
 
 	if (iMicFreq != iSampleRate)
-		srsMic = speex_resampler_init(1, iMicFreq, iSampleRate, 3, &err);
+		srsMic = AudioProcessingAdapter::Resampler::create(iMicFreq, iSampleRate, 1);
 
 	iMicLength = (iFrameSize * iMicFreq) / iSampleRate;
 
@@ -522,7 +517,7 @@ void AudioInput::initializeMixer() {
 	if (iEchoChannels > 0) {
 		bEchoMulti = (Global::get().s.echoOption == EchoCancelOptionID::SPEEX_MULTICHANNEL);
 		if (iEchoFreq != iSampleRate)
-			srsEcho = speex_resampler_init(bEchoMulti ? iEchoChannels : 1, iEchoFreq, iSampleRate, 3, &err);
+			srsEcho = AudioProcessingAdapter::Resampler::create(iEchoFreq, iSampleRate, bEchoMulti ? iEchoChannels : 1);
 		iEchoLength    = (iFrameSize * iEchoFreq) / iSampleRate;
 		iEchoMCLength  = bEchoMulti ? iEchoLength * iEchoChannels : iEchoLength;
 		iEchoFrameSize = bEchoMulti ? iFrameSize * iEchoChannels : iFrameSize;
@@ -581,11 +576,12 @@ void AudioInput::addMic(const void *data, unsigned int nsamp) {
 			float *pfOutput = srsMic ? (float *) alloca(iFrameSize * sizeof(float)) : nullptr;
 			float *ptr      = srsMic ? pfOutput : pfMicInput;
 
-			if (srsMic) {
-				spx_uint32_t inlen  = iMicLength;
-				spx_uint32_t outlen = iFrameSize;
-				speex_resampler_process_float(srsMic, 0, pfMicInput, &inlen, pfOutput, &outlen);
-			}
+			if (nsamp < iMicLength) {
+				if (srsMic && srsMic->isValid()) {
+					std::uint32_t inlen = iMicLength;
+					std::uint32_t outlen = iFrameSize;
+					srsMic->processFloat(pfMicInput, &inlen, pfOutput, &outlen);
+				}
 
 			// If echo cancellation is enabled the pointer ends up in the resynchronizer queue
 			// and may need to outlive this function's frame
@@ -648,11 +644,12 @@ void AudioInput::addEcho(const void *data, unsigned int nsamp) {
 			float *pfOutput = srsEcho ? (float *) alloca(iEchoFrameSize * sizeof(float)) : nullptr;
 			float *ptr      = srsEcho ? pfOutput : pfEchoInput;
 
-			if (srsEcho) {
-				spx_uint32_t inlen  = iEchoLength;
-				spx_uint32_t outlen = iFrameSize;
-				speex_resampler_process_interleaved_float(srsEcho, pfEchoInput, &inlen, pfOutput, &outlen);
-			}
+			if (nsamp < iEchoLength) {
+				if (srsEcho && srsEcho->isValid()) {
+					std::uint32_t inlen = iEchoLength;
+					std::uint32_t outlen = iFrameSize;
+					srsEcho->processInterleavedFloat(pfEchoInput, &inlen, pfOutput, &outlen);
+				}
 
 			short *outbuff = new short[iEchoFrameSize];
 
@@ -747,34 +744,35 @@ void AudioInput::resetAudioProcessor() {
 	if (!bResetProcessor)
 		return;
 
-	if (sesEcho)
-		speex_echo_state_destroy(sesEcho);
+	sesEcho.reset();
 
-	m_preprocessor.init(iSampleRate, iFrameSize);
+	m_preprocessor = AudioProcessingAdapter::Preprocessor::create(iFrameSize, iSampleRate);
 	resync.reset();
 	selectNoiseCancel();
 
-	m_preprocessor.setVAD(true);
-	m_preprocessor.setAGC(true);
-	m_preprocessor.setDereverb(true);
+	if (m_preprocessor) {
+		m_preprocessor->setVadEnabled(true);
+		m_preprocessor->setAgcEnabled(true);
+		// Note: dereverb is handled by the new preprocessor internally
 
-	m_preprocessor.setAGCTarget(30000);
+		m_preprocessor->setAgcTargetLevel(-18.0f); // Convert from linear to dB
 
-	const float v = 30000.0f / static_cast< float >(Global::get().s.iMinLoudness);
-	m_preprocessor.setAGCMaxGain(static_cast< std::int32_t >(floorf(20.0f * log10f(v))));
-	m_preprocessor.setAGCDecrement(-60);
-
-	if (noiseCancel == Settings::NoiseCancelSpeex) {
-		m_preprocessor.setNoiseSuppress(Global::get().s.iSpeexNoiseCancelStrength);
+		const float v = 30000.0f / static_cast< float >(Global::get().s.iMinLoudness);
+		// Note: AGC max gain and decrement are handled internally by the new preprocessor
+	
+		if (noiseCancel == Settings::NoiseCancelSpeex) {
+			float level = static_cast<float>(Global::get().s.iSpeexNoiseCancelStrength) / 100.0f;
+			m_preprocessor->setNoiseSuppressionLevel(level);
+		}
 	}
 
 	if (iEchoChannels > 0) {
 		int filterSize = iFrameSize * (10 + resync.getNominalLag());
-		sesEcho =
-			speex_echo_state_init_mc(iFrameSize, filterSize, 1, bEchoMulti ? static_cast< int >(iEchoChannels) : 1);
-		int iArg = iSampleRate;
-		speex_echo_ctl(sesEcho, SPEEX_ECHO_SET_SAMPLING_RATE, &iArg);
-		m_preprocessor.setEchoState(sesEcho);
+		sesEcho = AudioProcessingAdapter::EchoCanceller::create(
+			iFrameSize, filterSize, iSampleRate, bEchoMulti ? iEchoChannels : 1);
+		if (sesEcho && m_preprocessor) {
+			m_preprocessor->setEchoCanceller(sesEcho);
+		}
 
 		qWarning("AudioInput: ECHO CANCELLER ACTIVE");
 	} else {
@@ -900,8 +898,8 @@ void AudioInput::encodeAudioFrame(AudioChunk chunk) {
 	}
 
 	short psClean[iFrameSize];
-	if (sesEcho && chunk.speaker) {
-		speex_echo_cancellation(sesEcho, chunk.mic, chunk.speaker, psClean);
+	if (sesEcho && sesEcho->isValid() && chunk.speaker) {
+		sesEcho->processEchoCancellation(chunk.mic, chunk.speaker, psClean, iFrameSize);
 		psSource = psClean;
 	} else {
 		psSource = chunk.mic;
@@ -923,7 +921,9 @@ void AudioInput::encodeAudioFrame(AudioChunk chunk) {
 	}
 #endif
 
-	m_preprocessor.run(*psSource);
+	if (m_preprocessor && m_preprocessor->isValid()) {
+		m_preprocessor->processFrame(psSource, iFrameSize);
+	}
 
 	sum = 1.0f;
 	for (unsigned int i = 0; i < iFrameSize; i++)
@@ -941,7 +941,7 @@ void AudioInput::encodeAudioFrame(AudioChunk chunk) {
 						   static_cast< std::streamsize >(iFrameSize * sizeof(short)));
 	}
 
-	fSpeechProb = static_cast< float >(m_preprocessor.getSpeechProb()) / 100.0f;
+	fSpeechProb = m_preprocessor ? m_preprocessor->getSpeechProbability() : 0.0f;
 
 	// clean microphone level: peak of filtered signal attenuated by AGC gain
 	dPeakCleanMic = qMax(dPeakSignal - static_cast< float >(gainValue), -96.0f);
