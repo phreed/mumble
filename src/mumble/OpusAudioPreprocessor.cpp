@@ -24,11 +24,14 @@ extern "C" {
 #endif
 
 std::unique_ptr<OpusAudioPreprocessor> OpusAudioPreprocessor::create(
-    const Config &config,
+    const Config *config,
     Error *error
 ) {
+    Config defaultConfig;
+    const Config &actualConfig = config ? *config : defaultConfig;
+    
     auto preprocessor = std::unique_ptr<OpusAudioPreprocessor>(
-        new OpusAudioPreprocessor(config)
+        new OpusAudioPreprocessor(actualConfig)
     );
     
     Error initError = preprocessor->initialize();
@@ -44,10 +47,6 @@ std::unique_ptr<OpusAudioPreprocessor> OpusAudioPreprocessor::create(
 OpusAudioPreprocessor::OpusAudioPreprocessor(const Config &config)
     : m_config(config)
     , m_initialized(false)
-    , m_audioProcessing(nullptr)
-    , m_gainControl(nullptr)
-    , m_noiseSuppression(nullptr)
-    , m_voiceDetection(nullptr)
 #ifdef USE_RNNOISE
     , m_rnnoise(nullptr)
 #endif
@@ -56,6 +55,9 @@ OpusAudioPreprocessor::OpusAudioPreprocessor(const Config &config)
 {
     // Initialize statistics
     m_statistics = {};
+    
+    // WebRTC pointers will be default-initialized to nullptr
+    // This avoids incomplete type issues in the initializer list
 }
 
 OpusAudioPreprocessor::~OpusAudioPreprocessor() {
@@ -71,10 +73,12 @@ OpusAudioPreprocessor::~OpusAudioPreprocessor() {
 OpusAudioPreprocessor::OpusAudioPreprocessor(OpusAudioPreprocessor &&other) noexcept
     : m_config(other.m_config)
     , m_initialized(other.m_initialized)
+#ifdef USE_WEBRTC_AEC
     , m_audioProcessing(std::move(other.m_audioProcessing))
     , m_gainControl(std::move(other.m_gainControl))
     , m_noiseSuppression(std::move(other.m_noiseSuppression))
     , m_voiceDetection(std::move(other.m_voiceDetection))
+#endif
 #ifdef USE_RNNOISE
     , m_rnnoise(other.m_rnnoise)
 #endif
@@ -103,10 +107,12 @@ OpusAudioPreprocessor &OpusAudioPreprocessor::operator=(OpusAudioPreprocessor &&
         
         m_config = other.m_config;
         m_initialized = other.m_initialized;
+#ifdef USE_WEBRTC_AEC
         m_audioProcessing = std::move(other.m_audioProcessing);
         m_gainControl = std::move(other.m_gainControl);
         m_noiseSuppression = std::move(other.m_noiseSuppression);
         m_voiceDetection = std::move(other.m_voiceDetection);
+#endif
 #ifdef USE_RNNOISE
         m_rnnoise = other.m_rnnoise;
         other.m_rnnoise = nullptr;

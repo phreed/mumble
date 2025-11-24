@@ -150,6 +150,11 @@ void AudioEchoWidget::paintEvent(QPaintEvent *) {
 
 	ai->qmSpeex.lock();
 
+#ifdef USE_OPUS_AUDIO_PROCESSING
+	// Echo impulse response not available in Opus mode - skip visualization
+	ai->qmSpeex.unlock();
+	return;
+#else
 	spx_int32_t sz;
 	speex_echo_ctl(ai->sesEcho, SPEEX_ECHO_GET_IMPULSE_RESPONSE_SIZE, &sz);
 
@@ -203,6 +208,7 @@ void AudioEchoWidget::paintEvent(QPaintEvent *) {
 
 	paint.setPen(QPen(QBrush(QColor::fromRgbF(1.0f, 0.0f, 1.0f)), 0));
 	paint.drawPolyline(poly);
+#endif
 }
 
 AudioNoiseWidget::AudioNoiseWidget(QWidget *p) : QWidget(p) {
@@ -223,11 +229,17 @@ void AudioNoiseWidget::paintEvent(QPaintEvent *) {
 
 	ai->qmSpeex.lock();
 
+#ifndef USE_OPUS_AUDIO_PROCESSING
 	const AudioPreprocessor::psd_t ps    = ai->m_preprocessor.getPSD();
 	const AudioPreprocessor::psd_t noise = ai->m_preprocessor.getNoisePSD();
+#endif
 
 	ai->qmSpeex.unlock();
 
+#ifdef USE_OPUS_AUDIO_PROCESSING
+	// Skip PSD visualization in Opus mode - not available
+	return;
+#else
 	assert(ps.size() == noise.size());
 
 	qreal sx, sy;
@@ -268,6 +280,7 @@ void AudioNoiseWidget::paintEvent(QPaintEvent *) {
 
 	paint.setPen(Qt::red);
 	paint.drawPolyline(poly);
+#endif
 }
 
 AudioStats::AudioStats(QWidget *p) : QDialog(p) {
@@ -321,14 +334,17 @@ void AudioStats::on_Tick_timeout() {
 	FORMAT_TO_TXT("%06.2f dB", ai->dPeakSignal);
 	qlSignalLevel->setText(txt);
 
+#ifndef USE_OPUS_AUDIO_PROCESSING
 	const AudioPreprocessor::psd_t ps    = ai->m_preprocessor.getPSD();
 	const AudioPreprocessor::psd_t noise = ai->m_preprocessor.getNoisePSD();
 
 	assert(ps.size() == noise.size());
+#endif
 
 	float s = 0.0f;
 	float n = 0.0001f;
 
+#ifndef USE_OPUS_AUDIO_PROCESSING
 	unsigned int start = static_cast< unsigned int >(ps.size() * 300) / SAMPLE_RATE;
 	unsigned int stop  = static_cast< unsigned int >(ps.size() * 2000) / SAMPLE_RATE;
 
@@ -338,11 +354,21 @@ void AudioStats::on_Tick_timeout() {
 	}
 
 	FORMAT_TO_TXT("%06.3f", s / n);
+#else
+	// SNR calculation not available in Opus mode
+	txt = QString("N/A");
+#endif
 	qlMicSNR->setText(txt);
 
+#ifdef USE_OPUS_AUDIO_PROCESSING
+	// AGC gain not available in Opus mode
+	txt = QString("N/A");
+	qlMicVolume->setText(txt);
+#else
 	float fv = powf(10.0f, (static_cast< float >(ai->m_preprocessor.getAGCGain()) / 20.0f));
 	FORMAT_TO_TXT("%03.0f%%", 100.0f / fv);
 	qlMicVolume->setText(txt);
+#endif
 
 	FORMAT_TO_TXT("%03.0f%%", ai->fSpeechProb * 100.0f);
 	qlSpeechProb->setText(txt);

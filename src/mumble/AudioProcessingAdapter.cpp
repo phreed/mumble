@@ -521,7 +521,7 @@ bool AudioProcessingAdapter::Preprocessor::initialize() {
     config.framesPerBuffer = m_frameSize;
     
     OpusAudioPreprocessor::Error error;
-    m_opusPreprocessor = OpusAudioPreprocessor::create(config, &error);
+    m_opusPreprocessor = OpusAudioPreprocessor::create(&config, &error);
     
     return m_opusPreprocessor != nullptr;
 #else
@@ -687,5 +687,45 @@ bool AudioProcessingAdapter::Preprocessor::isValid() const {
     // SpeexDSP preprocessor doesn't have an isValid method
     // We assume it's valid if it was initialized successfully
     return true;
+#endif
+}
+
+// Speex compatibility methods
+
+void AudioProcessingAdapter::Preprocessor::setDenoise(float level) {
+#ifdef USE_OPUS_AUDIO_PROCESSING
+    // Map to Opus noise suppression level
+    if (m_opusPreprocessor) {
+        setNoiseSuppressionLevel(level);
+    }
+#else
+    m_speexPreprocessor.setDenoise(level);
+#endif
+}
+
+std::int32_t AudioProcessingAdapter::Preprocessor::getAGCGain() const {
+#ifdef USE_OPUS_AUDIO_PROCESSING
+    // AGC gain not available in Opus mode - return default
+    return 0;
+#else
+    return m_speexPreprocessor.getAGCGain();
+#endif
+}
+
+void AudioProcessingAdapter::Preprocessor::setNoiseSuppress(float level) {
+#ifdef USE_OPUS_AUDIO_PROCESSING
+    // Map to Opus noise suppression level
+    setNoiseSuppressionLevel(level);
+#else
+    m_speexPreprocessor.setNoiseSuppress(level);
+#endif
+}
+
+void AudioProcessingAdapter::Preprocessor::setAGCIncrement(int increment) {
+#ifdef USE_OPUS_AUDIO_PROCESSING
+    // AGC increment not directly supported in Opus mode - ignore
+    (void)increment; // Suppress unused parameter warning
+#else
+    m_speexPreprocessor.setAGCIncrement(increment);
 #endif
 }

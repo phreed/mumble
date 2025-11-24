@@ -135,7 +135,7 @@ public:
      * @return Unique pointer to OpusAudioPreprocessor instance, or nullptr on failure
      */
     static std::unique_ptr<OpusAudioPreprocessor> create(
-        const Config &config = Config{},
+        const Config *config = nullptr,
         Error *error = nullptr
     );
 
@@ -391,10 +391,12 @@ private:
     bool m_initialized;
 
     // WebRTC Audio Processing
+#ifdef USE_WEBRTC_AEC
     std::unique_ptr<webrtc::AudioProcessing> m_audioProcessing;
     std::unique_ptr<webrtc::GainControl> m_gainControl;
     std::unique_ptr<webrtc::NoiseSuppression> m_noiseSuppression;
     std::unique_ptr<webrtc::VoiceDetection> m_voiceDetection;
+#endif
 
 #ifdef USE_RNNOISE
     // RNNoise state

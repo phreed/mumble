@@ -7,6 +7,7 @@
 #define MUMBLE_MUMBLE_AUDIOPROCESSINGADAPTER_H_
 
 #include <cstdint>
+#include <cstring>
 #include <memory>
 
 #ifdef USE_OPUS_AUDIO_PROCESSING
@@ -15,6 +16,9 @@
 #ifdef USE_WEBRTC_AEC
 #include "OpusEchoCanceller.h"
 #endif
+// Include Speex types for compatibility even in Opus mode
+#include <speex/speex_resampler.h>
+#include <speex/speex_echo.h>
 #else
 #include <speex/speex_resampler.h>
 #include <speex/speex_echo.h>
@@ -271,6 +275,30 @@ public:
          * Check if the preprocessor is valid.
          */
         bool isValid() const;
+
+        /**
+         * Speex compatibility methods
+         */
+        
+        /**
+         * Set denoise (noise suppression) level - Speex compatibility
+         */
+        void setDenoise(float level);
+        
+        /**
+         * Get AGC gain value - Speex compatibility
+         */
+        std::int32_t getAGCGain() const;
+        
+        /**
+         * Set noise suppression level - Speex compatibility
+         */
+        void setNoiseSuppress(float level);
+        
+        /**
+         * Set AGC increment - Speex compatibility
+         */
+        void setAGCIncrement(int increment);
 
     private:
         Preprocessor(std::uint32_t frameSize, std::uint32_t sampleRate);

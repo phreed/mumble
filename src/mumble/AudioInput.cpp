@@ -266,7 +266,8 @@ AudioInput::AudioInput()
 	bEchoMulti = false;
 
 	sesEcho = nullptr;
-	srsMic = srsEcho = nullptr;
+	srsMic.reset();
+	srsEcho.reset();
 
 	iEchoChannels = iMicChannels = 0;
 	iEchoFilled = iMicFilled = 0;
@@ -582,6 +583,7 @@ void AudioInput::addMic(const void *data, unsigned int nsamp) {
 					std::uint32_t outlen = iFrameSize;
 					srsMic->processFloat(pfMicInput, &inlen, pfOutput, &outlen);
 				}
+			}
 
 			// If echo cancellation is enabled the pointer ends up in the resynchronizer queue
 			// and may need to outlive this function's frame
@@ -650,6 +652,7 @@ void AudioInput::addEcho(const void *data, unsigned int nsamp) {
 					std::uint32_t outlen = iFrameSize;
 					srsEcho->processInterleavedFloat(pfEchoInput, &inlen, pfOutput, &outlen);
 				}
+			}
 
 			short *outbuff = new short[iEchoFrameSize];
 
@@ -771,7 +774,7 @@ void AudioInput::resetAudioProcessor() {
 		sesEcho = AudioProcessingAdapter::EchoCanceller::create(
 			iFrameSize, filterSize, iSampleRate, bEchoMulti ? iEchoChannels : 1);
 		if (sesEcho && m_preprocessor) {
-			m_preprocessor->setEchoCanceller(sesEcho);
+			m_preprocessor->setEchoCanceller(std::shared_ptr<AudioProcessingAdapter::EchoCanceller>(sesEcho.release()));
 		}
 
 		qWarning("AudioInput: ECHO CANCELLER ACTIVE");
@@ -833,7 +836,7 @@ void AudioInput::selectNoiseCancel() {
 			qInfo("AudioInput: Using RNNoise 0.2 and Speex as noise canceller");
 			break;
 	}
-	m_preprocessor.setDenoise(preprocessorDenoise);
+	m_preprocessor->setDenoise(preprocessorDenoise);
 }
 
 int AudioInput::encodeOpusFrame(short *source, int size, EncodingOutputBuffer &buffer) {
@@ -891,10 +894,10 @@ void AudioInput::encodeAudioFrame(AudioChunk chunk) {
 	QMutexLocker l(&qmSpeex);
 	resetAudioProcessor();
 
-	const std::int32_t gainValue = m_preprocessor.getAGCGain();
+	const std::int32_t gainValue = m_preprocessor->getAGCGain();
 
 	if (noiseCancel == Settings::NoiseCancelSpeex || noiseCancel == Settings::NoiseCancelBoth) {
-		m_preprocessor.setNoiseSuppress(Global::get().s.iSpeexNoiseCancelStrength - gainValue);
+		m_preprocessor->setNoiseSuppress(Global::get().s.iSpeexNoiseCancelStrength - gainValue);
 	}
 
 	short psClean[iFrameSize];
@@ -1074,10 +1077,10 @@ void AudioInput::encodeAudioFrame(AudioChunk chunk) {
 			}
 		}
 
-		m_preprocessor.setAGCIncrement(0);
+		m_preprocessor->setAGCIncrement(0);
 		return;
 	} else {
-		m_preprocessor.setAGCIncrement(12);
+		m_preprocessor->setAGCIncrement(12);
 	}
 
 	if (bIsSpeech && !bPreviousVoice) {

@@ -8,6 +8,7 @@
 #include <soxr.h>
 #include <algorithm>
 #include <cassert>
+#include <vector>
 
 OpusResampler::OpusResampler(
     std::uint32_t inputSampleRate,

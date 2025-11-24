@@ -7,7 +7,9 @@
 
 #include <utility>
 
+#ifndef USE_OPUS_AUDIO_PROCESSING
 #include <speex/speex_preprocess.h>
+#endif
 
 AudioPreprocessor::AudioPreprocessor(AudioPreprocessor &&other) : m_handle(std::exchange(other.m_handle, nullptr)) {
 }

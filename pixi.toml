@@ -59,11 +59,11 @@ poco = "*"                      # C++ libraries for network programming
 
 [tasks.configure]
 description = "Main configuration task - builds client only with minimal features"
-cmd = "cmake -B build -DCMAKE_BUILD_TYPE=Release -G Ninja -Dserver=OFF -Doverlay-xcompile=OFF -Dcrash-report=OFF -Dplugins=OFF -Duse-webrtc-aec=OFF -Dspeechd=OFF -Dzeroconf=OFF -Dwarnings-as-errors=OFF -Dbundled-speex=ON -DCMAKE_PREFIX_PATH=$CONDA_PREFIX"
+cmd = "cmake -B build -DCMAKE_BUILD_TYPE=Release -G Ninja -Dserver=OFF -Doverlay-xcompile=OFF -Dcrash-report=OFF -Dplugins=OFF -Duse-webrtc-aec=OFF -Dspeechd=OFF -Dzeroconf=OFF -Dwarnings-as-errors=OFF -DCMAKE_PREFIX_PATH=$CONDA_PREFIX"
 
 [tasks.configure-debug]
 description = "Debug configuration"
-cmd = "cmake -B build -DCMAKE_BUILD_TYPE=Debug -G Ninja -Dserver=OFF -Doverlay-xcompile=OFF -Dcrash-report=OFF -Dplugins=OFF -Duse-webrtc-aec=OFF -Dspeechd=OFF -Dzeroconf=OFF -Dwarnings-as-errors=OFF -Dbundled-speex=ON -DCMAKE_PREFIX_PATH=$CONDA_PREFIX"
+cmd = "cmake -B build -DCMAKE_BUILD_TYPE=Debug -G Ninja -Dserver=OFF -Doverlay-xcompile=OFF -Dcrash-report=OFF -Dplugins=OFF -Duse-webrtc-aec=OFF -Dspeechd=OFF -Dzeroconf=OFF -Dwarnings-as-errors=OFF -DCMAKE_PREFIX_PATH=$CONDA_PREFIX"
 
 [tasks.build]
 description = "Build tasks"

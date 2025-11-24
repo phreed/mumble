@@ -113,8 +113,7 @@ set(MUMBLE_SOURCES
 	"AudioOutputBuffer.cpp"
 	"AudioOutputBuffer.h"
 	"AudioOutputToken.h"
-	"AudioPreprocessor.cpp"
-	"AudioPreprocessor.h"
+
 	"AudioStats.cpp"
 	"AudioStats.h"
 	"AudioStats.ui"
@@ -393,6 +392,7 @@ add_custom_command(
 )
 target_sources(mumble PRIVATE "ApplicationPalette.h")
 target_include_directories(mumble PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
+target_include_directories(mumble PRIVATE "${3RDPARTY_DIR}/speex-stubs")
 
 target_link_libraries(mumble PRIVATE mumble_client_object_lib shared spdlog::spdlog)
 target_link_libraries(mumble PRIVATE CLI11::CLI11)
@@ -774,10 +774,14 @@ else()
 	endif()
 endif()
 
+# Add Speex stub includes for all builds to ensure compatibility
+target_include_directories(mumble_client_object_lib PRIVATE "${3RDPARTY_DIR}/speex-stubs")
+
 # Add new source files for Opus audio processing
 if(opus-audio-processing)
 	target_sources(mumble_client_object_lib
 		PRIVATE
+			"${3RDPARTY_DIR}/speex-stubs/speex_stubs.c"
 			"OpusResampler.cpp"
 			"OpusResampler.h"
 			"OpusAudioPreprocessor.cpp"
@@ -797,6 +801,8 @@ else()
 	# Add adapter for SpeexDSP compatibility
 	target_sources(mumble_client_object_lib
 		PRIVATE
+			"AudioPreprocessor.cpp"
+			"AudioPreprocessor.h"
 			"AudioProcessingAdapter.cpp"
 			"AudioProcessingAdapter.h"
 	)
