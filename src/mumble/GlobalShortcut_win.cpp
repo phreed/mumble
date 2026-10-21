@@ -20,6 +20,7 @@
 #include <mutex>
 #include <sstream>
 
+#include <QDebug>
 #include <QUuid>
 
 extern "C" {

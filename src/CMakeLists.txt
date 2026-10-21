@@ -13,6 +13,7 @@ option(qssldiffiehellmanparameters "Build support for custom Diffie-Hellman para
 option(zeroconf "Build support for zeroconf (mDNS/DNS-SD)." ON)
 
 option(tracy "Enable the tracy profiler." OFF)
+option(bundled-tracy "Build the included version of Tracy instead of looking for one on the system." ON)
 
 find_package("Qt6" 6.2
 	COMPONENTS
@@ -38,7 +39,13 @@ protobuf_generate(LANGUAGE cpp TARGET shared PROTOS ${UDP_PROTO_FILE} OUT_VAR BU
 
 # Disable warnings for the generated source files
 foreach(CURRENT_FILE IN LISTS BUILT_PROTO_FILES BUILT_UDP_PROTO_FILES)
-	set_source_files_properties("${CURRENT_FILE}" PROPERTIES COMPILE_FLAGS "-w")
+	if(MSVC)
+		set_source_files_properties("${CURRENT_FILE}" PROPERTIES
+			COMPILE_FLAGS "/wd4996 /wd4244 /wd4267 /wd4005 /wd4800 /wd4018 /wd4065 /wd4100"
+		)
+	else()
+		set_source_files_properties("${CURRENT_FILE}" PROPERTIES COMPILE_FLAGS "-w")
+	endif()
 endforeach()
 
 set_target_properties(shared
@@ -199,20 +206,24 @@ if(qssldiffiehellmanparameters)
 	target_compile_definitions(shared PUBLIC "USE_QSSLDIFFIEHELLMANPARAMETERS")
 endif()
 
-# Note: We always include and link against Tracy but it is only enabled, if we set the TRACY_ENABLE cmake option
-# to ON, before including the respective subdirectory
-set(TRACY_ENABLE ${tracy} CACHE BOOL "" FORCE)
-set(TRACY_ON_DEMAND ON CACHE BOOL "" FORCE)
-# We force to build Tracy as a static library in order to not create a dependency on the respective .so file
-# (can cause issues for packagers as that dependency is retained even though Tracy is disabled)
-set(PREV_BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS})
-set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
-add_subdirectory("${3RDPARTY_DIR}/tracy" "tracy" EXCLUDE_FROM_ALL)
-disable_warnings_for_all_targets_in("${3RDPARTY_DIR}/tracy")
-message(STATUS "Tracy: ${TRACY_ENABLE}")
-
-# Restore whatever BUILD_SHARED_LIBS was set to before
-set(BUILD_SHARED_LIBS ${PREV_BUILD_SHARED_LIBS} CACHE BOOL "" FORCE)
+if(bundled-tracy)
+	# Tracy's options must be set before adding its subdirectory.
+	set(TRACY_ENABLE ${tracy} CACHE BOOL "" FORCE)
+	set(TRACY_ON_DEMAND ON CACHE BOOL "" FORCE)
+	# Keep disabled profiling from introducing a shared library dependency.
+	set(PREV_BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS})
+	set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+	add_subdirectory("${3RDPARTY_DIR}/tracy" "tracy" EXCLUDE_FROM_ALL)
+	disable_warnings_for_all_targets_in("${3RDPARTY_DIR}/tracy")
+	set(BUILD_SHARED_LIBS ${PREV_BUILD_SHARED_LIBS} CACHE BOOL "" FORCE)
+else()
+	find_package(Threads REQUIRED)
+	find_package(Tracy CONFIG REQUIRED)
+	if(tracy)
+		target_compile_definitions(shared PUBLIC TRACY_ENABLE TRACY_ON_DEMAND)
+	endif()
+endif()
+message(STATUS "Tracy: ${tracy}")
 
 target_link_libraries(shared PUBLIC Tracy::TracyClient)
 

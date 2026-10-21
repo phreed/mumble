@@ -718,6 +718,7 @@ find_package("Opus" REQUIRED)
 target_link_libraries(mumble_client_lib PUBLIC Opus::opus)
 
 if(bundled-speex)
+	target_compile_definitions(mumble_client_lib PRIVATE MUMBLE_BUNDLED_SPEEX)
 	add_subdirectory("${3RDPARTY_DIR}/speexdsp-build" "${CMAKE_CURRENT_BINARY_DIR}/speexdsp" EXCLUDE_FROM_ALL)
 
 	# Disable all warnings that the speexdsp code may emit

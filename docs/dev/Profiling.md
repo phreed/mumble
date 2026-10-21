@@ -1,7 +1,11 @@
 # Profiling
 
 Mumble comes with built-in support for the [Tracy](https://github.com/wolfpld/tracy) profiler. In order to activate the baked-in instrumentation, use
-`-Dtracy=ON` when compiling Mumble. When using that option, you should see a line in the cmake output that says `TRACY_ENABLE: ON`.
+`-Dtracy=ON` when compiling Mumble. When using that option, you should see a line in the cmake output that says `Tracy: ON`.
+
+To use an installed Tracy client library, set `-Dbundled-tracy=OFF`. Its `TRACY_ENABLE` setting must match Mumble's `tracy`
+option. For profiling, that library must also be built with `TRACY_ON_DEMAND=ON`.
+Use a matching version of the Tracy profiler to read the resulting traces.
 
 
 ## Instrumented parts

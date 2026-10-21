@@ -38,7 +38,9 @@
 
 extern "C" {
 void __cpuid(int a[4], int b);
+#ifdef MUMBLE_BUNDLED_SPEEX
 void mumble_speex_init();
+#endif
 };
 
 #define DUMP_BUFFER_SIZE 1024
@@ -217,7 +219,9 @@ void os_init() {
 
 	SetHeapOptions();
 	enableCrashOnCrashes();
+#ifdef MUMBLE_BUNDLED_SPEEX
 	mumble_speex_init();
+#endif
 
 #ifdef QT_NO_DEBUG
 	QString hash;

@@ -44,6 +44,11 @@ Build the included version of RNNoise instead of looking for one on the system.
 Build the included version of Speex instead of looking for one on the system.
 (Default: ON)
 
+### bundled-tracy
+
+Build the included version of Tracy instead of looking for one on the system.
+(Default: ON)
+
 ### client
 
 Build the client (Mumble)
