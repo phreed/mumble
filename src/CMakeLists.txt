@@ -39,7 +39,7 @@ protobuf_generate(LANGUAGE cpp TARGET shared PROTOS ${UDP_PROTO_FILE} OUT_VAR BU
 
 # Disable warnings for the generated source files
 foreach(CURRENT_FILE IN LISTS BUILT_PROTO_FILES BUILT_UDP_PROTO_FILES)
-	if(MSVC)
+	if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
 		set_source_files_properties("${CURRENT_FILE}" PROPERTIES
 			COMPILE_FLAGS "/wd4996 /wd4244 /wd4267 /wd4005 /wd4800 /wd4018 /wd4065 /wd4100"
 		)
